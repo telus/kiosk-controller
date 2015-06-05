@@ -1,0 +1,132 @@
+#!/bin/bash
+set -e
+
+function loadsettings {
+  source $CONFIG_FILE
+}
+
+function writesettings {
+  rm $CONFIG_FILE
+  echo "KIOSK_PAGE=\"$KIOSK_PAGE\"" >> $CONFIG_FILE
+  echo "KIOSK_PORT=$KIOSK_PORT" >> $CONFIG_FILE
+  echo "KIOSK_CHROME_PID=$KIOSK_CHROME_PID" >> $CONFIG_FILE
+  echo "KIOSK_PYTHON_PID=$KIOSK_PYTHON_PID" >> $CONFIG_FILE
+}
+
+function validate {
+  KIOSK_STATUS=0
+  command -v chromium-browser >/dev/null 2>&1 || {
+    echo "Missing chromium-browser"; KIOSK_STATUS=1;
+  }
+  return $KIOSK_STATUS
+}
+
+function stopchromeifexists {
+  if ps -p $KIOSK_CHROME_PID 2> /dev/null | grep -q "chromium"; then
+    echo "Stopping chromium at PID $KIOSK_CHROME_PID"
+    kill $KIOSK_CHROME_PID
+  fi
+}
+
+function startchrome {
+  stopchromeifexists
+  nohup chromium-browser --kiosk $KIOSK_PAGE >/dev/null 2>&1 &
+  KIOSK_CHROME_PID=$!
+  echo "Starting chromium at pid $KIOSK_CHROME_PID"
+  writesettings
+}
+
+function page {
+  if [ "$1" == "-s" ]; then
+    KIOSK_NEW_PAGE=$2
+  else
+    KIOSK_NEW_PAGE=$1
+  fi
+  if [ "$KIOSK_NEW_PAGE" == "" ]; then
+    echo "No page specified"
+    exit 1
+  fi
+  KIOSK_OLD_PAGE=$KIOSK_PAGE
+  KIOSK_PAGE=$KIOSK_NEW_PAGE
+  startchrome
+  if [ "$1" != "-s" ]; then
+    KIOSK_PAGE=$KIOSK_OLD_PAGE
+  fi
+  writesettings
+}
+
+function port {
+  if [ "$1" == "-s" ]; then
+    KIOSK_NEW_PORT=$2
+  else
+    KIOSK_NEW_PORT=$1
+  fi
+  if [ "$KIOSK_NEW_PORT" == "" ]; then
+    echo "No page specified"
+    exit 1
+  fi
+  KIOSK_OLD_PORT=$KIOSK_PORT
+  KIOSK_PORT=$KIOSK_NEW_PORT
+  startchrome
+  if [ "$1" != "-s" ]; then
+    KIOSK_PORT=$KIOSK_OLD_PORT
+  fi
+  writesettings
+}
+
+function start {
+  startchrome
+}
+
+function stop {
+  stopchromeifexists
+}
+
+function usage {
+  echo "Usage: kiosk <command> [<args>]"
+  echo "Controls a Chromium kiosk mode instance"
+  echo "For details on the HTTP API this exposes, consult the README"
+  echo
+  echo "   help              prints this help"
+  echo "   page    <url>     changes the page Chromium is showing"
+  echo "   page -s <url>         and updates the startup settings"
+  echo "   port    <number>  changes the HTTP API port"
+  echo "   port -s <number>      and updates the startup settings"
+  echo "   start             (re)starts the API server and Chromium"
+  echo "   stop              stops the API server and Chromium"
+}
+
+# =====================================
+# Settings and Initialization
+# =====================================
+
+# default values
+KIOSK_PAGE="http://google.com"
+KIOSK_PORT=8000
+KIOSK_CHROME_PID=0
+KIOSK_PYTHON_PID=0
+
+# configuration
+CONFIG_FILE=~/.pi-kiosk
+
+# initialization
+touch $CONFIG_FILE
+loadsettings
+
+# start the program
+if ! validate && ! ([ "$1" == "setup" ] || [ "$1" == "help" ]) ; then
+  echo "Please install the missing dependencies"
+  exit 1
+fi
+
+if [ "$1" == "page" ]; then
+  page $2 $3
+elif [ "$1" == "port" ]; then
+  port $2 $3
+elif [ "$1" == "start" ]; then
+  start
+elif [ "$1" == "stop" ]; then
+  stop
+else
+  usage
+fi
