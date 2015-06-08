@@ -1,1 +1,3 @@
-*.log
+bottle.py
+data/kiosk*
+logs/*.log
