@@ -1,19 +1,18 @@
 #!/bin/bash
 set -e
 
-function loadsettings {
+function load_settings {
   source $CONFIG_FILE
 }
 
-function writesettings {
+function write_settings {
   rm $CONFIG_FILE
   echo "KIOSK_PAGE=\"$KIOSK_PAGE\"" >> $CONFIG_FILE
   echo "KIOSK_PORT=$KIOSK_PORT" >> $CONFIG_FILE
-  echo "KIOSK_CHROME_PID=$KIOSK_CHROME_PID" >> $CONFIG_FILE
   echo "KIOSK_PYTHON_PID=$KIOSK_PYTHON_PID" >> $CONFIG_FILE
 }
 
-function validate {
+function check_dependencies {
   KIOSK_STATUS=0
   command -v chromium-browser >/dev/null 2>&1 || {
     echo "Missing chromium-browser"; KIOSK_STATUS=1;
@@ -21,65 +20,43 @@ function validate {
   return $KIOSK_STATUS
 }
 
-function stopchromeifexists {
-  if ps -p $KIOSK_CHROME_PID 2> /dev/null | grep -q "chromium"; then
-    echo "Stopping chromium at PID $KIOSK_CHROME_PID"
-    kill $KIOSK_CHROME_PID
+function stop_chrome {
+  (pkill chromium && echo "Stopping existing chromium instances") || true
+}
+
+function start_chrome {
+  DISPLAY=:0 nohup chromium-browser --kiosk $KIOSK_PAGE >chromium.log 2>&1 &
+  echo "Starting chromium"
+}
+
+function stop_python_api {
+  if ps -p $KIOSK_PYTHON_PID 2> /dev/null | grep -q "python"; then
+    echo "Stopping http api at PID $KIOSK_PYTHON_PID"
+    kill $KIOSK_PYTHON_PID
   fi
 }
 
-function startchrome {
-  stopchromeifexists
-  nohup chromium-browser --kiosk $KIOSK_PAGE >/dev/null 2>&1 &
-  KIOSK_CHROME_PID=$!
-  echo "Starting chromium at pid $KIOSK_CHROME_PID"
-  writesettings
+function start_python_api {
+  return #api not ready yet
+  nohup python3 kiosk-http-api.py $KIOSK_PORT >python-http-api.log 2>&1 &
+  KIOSK_PYTHON_PID=$!
+  echo "Starting http api at PID $KIOSK_PYTHON_PID"
 }
 
 function page {
-  if [ "$1" == "-s" ]; then
-    KIOSK_NEW_PAGE=$2
-  else
-    KIOSK_NEW_PAGE=$1
-  fi
-  if [ "$KIOSK_NEW_PAGE" == "" ]; then
+  if [ "$1" == "" ]; then
     echo "No page specified"
     exit 1
   fi
-  KIOSK_OLD_PAGE=$KIOSK_PAGE
-  KIOSK_PAGE=$KIOSK_NEW_PAGE
-  startchrome
-  if [ "$1" != "-s" ]; then
-    KIOSK_PAGE=$KIOSK_OLD_PAGE
-  fi
-  writesettings
+  KIOSK_PAGE=$1
 }
 
 function port {
-  if [ "$1" == "-s" ]; then
-    KIOSK_NEW_PORT=$2
-  else
-    KIOSK_NEW_PORT=$1
-  fi
-  if [ "$KIOSK_NEW_PORT" == "" ]; then
-    echo "No page specified"
+  if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+    echo "No valid port specified"
     exit 1
   fi
-  KIOSK_OLD_PORT=$KIOSK_PORT
-  KIOSK_PORT=$KIOSK_NEW_PORT
-  startchrome
-  if [ "$1" != "-s" ]; then
-    KIOSK_PORT=$KIOSK_OLD_PORT
-  fi
-  writesettings
-}
-
-function start {
-  startchrome
-}
-
-function stop {
-  stopchromeifexists
+  KIOSK_PORT=$1
 }
 
 function usage {
@@ -87,13 +64,14 @@ function usage {
   echo "Controls a Chromium kiosk mode instance"
   echo "For details on the HTTP API this exposes, consult the README"
   echo
-  echo "   help              prints this help"
-  echo "   page    <url>     changes the page Chromium is showing"
-  echo "   page -s <url>         and updates the startup settings"
-  echo "   port    <number>  changes the HTTP API port"
-  echo "   port -s <number>      and updates the startup settings"
-  echo "   start             (re)starts the API server and Chromium"
-  echo "   stop              stops the API server and Chromium"
+  echo "  help                  prints this help"
+  echo "  page <url>            change the Chromium page (resets on reboot)"
+  echo "  page <url>  --save    change the Chromium page and persist"
+  echo "  port <number>         save a new API port; does not (re)start API"
+  echo "  start                 (re)starts the API server and Chromium"
+  echo "  start --noapi         (re)starts just Chromium; stops API if up"
+  echo "  status                prints the current page and port in JSON"
+  echo "  stop                  stops the API server and Chromium"
 }
 
 # =====================================
@@ -103,7 +81,6 @@ function usage {
 # default values
 KIOSK_PAGE="http://google.com"
 KIOSK_PORT=8000
-KIOSK_CHROME_PID=0
 KIOSK_PYTHON_PID=0
 
 # configuration
@@ -111,22 +88,32 @@ CONFIG_FILE=~/.pi-kiosk
 
 # initialization
 touch $CONFIG_FILE
-loadsettings
+load_settings
 
 # start the program
-if ! validate && ! ([ "$1" == "setup" ] || [ "$1" == "help" ]) ; then
+if ! check_dependencies && ! [ "$1" == "help" ] ; then
   echo "Please install the missing dependencies"
   exit 1
 fi
 
 if [ "$1" == "page" ]; then
-  page $2 $3
+  page $2
+  stop_chrome
+  start_chrome
+  [ "$3" == "--save" ] && write_settings
 elif [ "$1" == "port" ]; then
-  port $2 $3
+  port $2
+  write_settings
 elif [ "$1" == "start" ]; then
-  start
+  stop_chrome
+  stop_python_api
+  start_chrome
+  [ "$2" != "--noapi" ] && (start_python_api && write_settings)
 elif [ "$1" == "stop" ]; then
-  stop
+  stop_chrome
+  stop_python_api
+elif [ "$1" == "status" ]; then
+  echo "{\"page\":\"$KIOSK_PAGE\", \"port\":\"$KIOSK_PORT\"}"
 else
   usage
 fi
