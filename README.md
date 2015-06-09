@@ -21,21 +21,21 @@ Otherwise, it will display usage help.
 
 By default, kiosk will start an HTTP API with the following endpoints:
 
-### `GET /` - Current status (HTTP 200)
+**`GET / ` - Current status** 
 
 Returns the plain text of the currently set page.
 
-### `POST /` - Temporarily change page and restart (HTTP 200)
+**`POST /` - Temporarily change page**
 
 If a HTTP header `kiosk-page` is specified, the page will be temporarily changed and Chromium will restart.
 
 Otherwise, the browser will restart with the default page.
 
-### `PUT /` - Change and persist page and reset (HTTP 200 or HTTP 400)
+**`PUT / ` - Permanently change page**
 
 If a HTTP header `kiosk-page` is specified, the page will be saved as the new default and Chromium will restart.
 
-Otherwise, if no page is specified, and HTTP 400 is returned.
+Otherwise, if no page is specified, an HTTP 400 is returned.
 
 ##Todo
 
