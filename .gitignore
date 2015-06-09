@@ -1,3 +1,4 @@
 bottle.py
-data/kiosk*
-logs/*.log
+data
+!data/.gitkeep
+__pycache__

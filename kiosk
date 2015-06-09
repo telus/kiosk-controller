@@ -1,67 +1,123 @@
 #!/bin/bash
 set -e
 
-function write_settings {
-  echo "$KIOSK_PAGE" > $KIOSK_PAGE_FILE
-  echo "$KIOSK_PORT" > $KIOSK_PORT_FILE
-}
+# =====================================
+# Configuration
+# =====================================
+
+KIOSK_FALLBACK_PORT=8000
+KIOSK_FALLBACK_PAGE="http://google.com"
+
+KIOSK_PYTHON_LOG=./data/python.log
+KIOSK_CHROME_LOG=./data/chrome.log
+
+KIOSK_PYTHON_PID=./data/python.pid
+KIOSK_CHROME_PID=./data/chrome.pid
+
+KIOSK_CONFIG_PORT=./data/config-port
+KIOSK_CONFIG_PAGE=./data/config-page
+KIOSK_CONFIG_LAST=./data/config-last
+KIOSK_CONFIG_PAGE_TEMP=./data/config-temp
+
+# =====================================
+# Functions
+# =====================================
 
 function check_dependencies {
-  local KIOSK_STATUS=0
+  local STATUS=0
   command -v chromium-browser >/dev/null 2>&1 || {
-    echo "Missing chromium-browser: sudo apt-get install chromium-browser";
-    KIOSK_STATUS=1;
+    >&2 echo "Missing chromium-browser: sudo apt-get install chromium-browser"
+    STATUS=1;
   }
   command -v python3 >/dev/null 2>&1 || {
-    echo "Missing python3: sudo apt-get install python3";
-    KIOSK_STATUS=1;
+    >&2 echo "Missing python3: sudo apt-get install python3";
+    STATUS=1;
   }
   if [[ ! -f bottle.py ]]; then
-    echo "Missing bottle.py library: wget -q http://bottlepy.org/bottle.py"
-    KIOSK_STATUS=1;
+    >&2 echo "Missing bottle.py library: wget -q http://bottlepy.org/bottle.py"
+    STATUS=1;
   fi
-  return $KIOSK_STATUS
+  return $STATUS
 }
 
-function stop_chrome {
-  (pkill chromium && echo "Stopping existing chromium instances") || true
-}
-
-function start_chrome {
-  DISPLAY=:0 nohup chromium-browser --kiosk $KIOSK_PAGE >logs/chromium.log 2>&1 &
-  KIOSK_CHROME_PID=$!
-  echo "$KIOSK_PAGE" > $KIOSK_CURR_FILE
-  echo "Starting chromium with URL $KIOSK_PAGE"
-}
-
-function stop_python_api {
-  if ps -p $KIOSK_PYTHON_PID 2> /dev/null | grep -q "python"; then
-    echo "Stopping http api at PID $KIOSK_PYTHON_PID on port $KIOSK_PORT"
-    kill $KIOSK_PYTHON_PID
-  fi
-}
-
-function start_python_api {
-  nohup python3 kiosk-http-api.py $KIOSK_PORT >logs/python-http-api.log 2>&1 &
-  KIOSK_PYTHON_PID=$!
-  echo $KIOSK_PYTHON_PID > $KIOSK_PID_FILE
-  echo "Starting http api at PID $KIOSK_PYTHON_PID on port $KIOSK_PORT"
-}
-
-function page {
-  if [ "$1" == "" ]; then
+function set_page {
+  if [ -z "$1" ]; then
     echo "No page specified"
     exit 1
   fi
-  KIOSK_PAGE=$1
+  echo "$1" > $KIOSK_CONFIG_PAGE
 }
 
-function port {
-  if ! [[ "$1" =~ ^[0-9]+$ ]]; then
-    echo "No valid port specified"
+function set_temp_page {
+  if [ -z "$1" ]; then
+    >&2 echo "No page specified"
     exit 1
   fi
-  KIOSK_PORT=$1
+  echo "$1" > $KIOSK_CONFIG_PAGE_TEMP
+}
+
+function set_port {
+  if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+    >&2 echo "No valid port specified"
+    exit 1
+  fi
+  echo "$1" > $KIOSK_CONFIG_PORT
+}
+
+function get_port {
+  KIOSK_PORT=$(cat $KIOSK_CONFIG_PORT)
+  if [ -z "$KIOSK_PORT" ]; then
+    KIOSK_PORT=$KIOSK_FALLBACK_PORT
+  fi
+}
+
+function get_page {
+  KIOSK_PAGE=$(cat $KIOSK_CONFIG_PAGE_TEMP)
+  echo "" > $KIOSK_CONFIG_PAGE_TEMP
+  if [ -z "$KIOSK_PAGE" ]; then
+    KIOSK_PAGE=$(cat $KIOSK_CONFIG_PAGE)
+  fi
+  if [ -z "$KIOSK_PAGE" ]; then
+    KIOSK_PAGE=$KIOSK_FALLBACK_PAGE
+  fi
+  echo $KIOSK_PAGE > $KIOSK_CONFIG_LAST
+}
+
+function start_chromium {
+  get_page
+  DISPLAY=:0 nohup chromium-browser --incognito \
+        --kiosk $KIOSK_PAGE >$KIOSK_CHROME_LOG 2>&1 &
+  echo $! > $KIOSK_CHROME_PID
+  echo "  [Chromium] Starting at PID $! with URL $KIOSK_PAGE"
+}
+
+function start_python_api {
+  get_port
+  if [[ "$KIOSK_PORT" = "0" ]]; then
+    echo "[Python API] Offline because port=0"
+    return
+  fi
+  nohup python3 kiosk-http-api.py $0 $KIOSK_PORT $KIOSK_CONFIG_LAST \
+                $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_PAGE_TEMP \
+        >$KIOSK_PYTHON_LOG 2>&1 &
+  echo $! > $KIOSK_PYTHON_PID
+  echo "[Python API] Starting at PID $! on port $KIOSK_PORT"
+}
+
+function stop_chromium {
+  local PID=$(cat $KIOSK_CHROME_PID)
+  if ps -p $PID 2> /dev/null | grep -q "chromium"; then
+    echo "  [Chromium] Stopping at PID $PID."
+    kill $PID
+  fi
+}
+
+function stop_python_api {
+  local PID=$(cat $KIOSK_PYTHON_PID)
+  if ps -p $PID 2> /dev/null | grep -q "python"; then
+    echo "[Python API] Stopping at PID $PID."
+    kill $PID
+  fi
 }
 
 function usage {
@@ -69,6 +125,8 @@ function usage {
   echo "Controls a Chromium kiosk mode instance"
   echo "For details on the HTTP API this exposes, consult the README"
   echo
+  echo "  api               (re)starts just the API"
+  echo "  chromium          (re)starts just Chromium"
   echo "  help              prints this help"
   echo "  page <url>        sets the default page"
   echo "  port <number>     sets the default API port; 0 to disable"
@@ -78,44 +136,38 @@ function usage {
 }
 
 # =====================================
-# Settings and Initialization
+# Initialization
 # =====================================
 
-# configuration
-KIOSK_PAGE_FILE=./data/kiosk_page
-KIOSK_CURR_FILE=./data/kiosk_curr # the most recently displayed page
-KIOSK_PORT_FILE=./data/kiosk_port
-KIOSK_PID_FILE=./data/kiosk_python.pid
+touch $KIOSK_PYTHON_LOG $KIOSK_CHROME_LOG $KIOSK_PYTHON_PID \
+      $KIOSK_CHROME_PID $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE \
+      $KIOSK_CONFIG_LAST $KIOSK_CONFIG_PAGE_TEMP
 
-# initialization
-touch $KIOSK_PAGE_FILE $KIOSK_PORT_FILE $KIOSK_PID_FILE $KIOSK_CURR_FILE
-KIOSK_PAGE=`cat $KIOSK_PAGE_FILE`
-KIOSK_PORT=`cat $KIOSK_PORT_FILE`
-KIOSK_PYTHON_PID=`cat $KIOSK_PID_FILE`
-[[ "$KIOSK_PAGE" == "" ]] && KIOSK_PAGE="http://google.com"
-[[ "$KIOSK_PORT" == "" ]] && KIOSK_PORT=8000
-[[ "$KIOSK_PYTHON_PID" == "" ]] && KIOSK_PYTHON_PID=0
-
-# start the program
 if ! check_dependencies && ! [ "$1" == "help" ] ; then
   echo "Please install the missing dependencies"
   exit 1
 fi
 
-if [ "$1" == "page" ]; then
-  page $2
-  write_settings
-elif [ "$1" == "port" ]; then
-  port $2
-  write_settings
-elif [ "$1" == "start" ]; then
-  stop_chrome
+if [ "$1" == "api" ]; then
   stop_python_api
-  [ -z "$2" ] || KIOSK_PAGE=$2
-  start_chrome
-  [ "$KIOSK_PORT" = "0" ] || start_python_api
+  start_python_api
+elif [ "$1" == "chromium" ]; then
+  stop_chromium
+  start_chromium
+elif [ "$1" == "page" ]; then
+  set_page $2
+elif [ "$1" == "port" ]; then
+  set_port $2
+elif [ "$1" == "start" ]; then
+  stop_chromium
+  stop_python_api
+  if [ -n "$2" ]; then
+    set_temp_page $2
+  fi
+  start_chromium
+  start_python_api
 elif [ "$1" == "stop" ]; then
-  stop_chrome
+  stop_chromium
   stop_python_api
 else
   usage
