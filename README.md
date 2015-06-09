@@ -39,6 +39,6 @@ Otherwise, if no page is specified, an HTTP 400 is returned.
 
 - Code review
 
-#Ideas
+##Ideas
 
 - An iframe + sockets based page could get around the chromium control issues. The CLI could hook into a server sending messages to the client to switch the page, reload it, etc.
