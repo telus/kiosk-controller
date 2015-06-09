@@ -12,7 +12,6 @@ KIOSK_PYTHON_LOG=./data/python.log
 KIOSK_CHROME_LOG=./data/chrome.log
 
 KIOSK_PYTHON_PID=./data/python.pid
-KIOSK_CHROME_PID=./data/chrome.pid
 
 KIOSK_CONFIG_PORT=./data/config-port
 KIOSK_CONFIG_PAGE=./data/config-page
@@ -99,8 +98,7 @@ function start_chromium {
   get_page
   DISPLAY=:0 nohup chromium-browser --incognito \
         --kiosk $KIOSK_PAGE >$KIOSK_CHROME_LOG 2>&1 &
-  echo $! > $KIOSK_CHROME_PID
-  echo "  [Chromium] Starting at PID $! with URL $KIOSK_PAGE"
+  echo "  [Chromium] Started with URL $KIOSK_PAGE"
 }
 
 function start_python_api {
@@ -118,11 +116,8 @@ function start_python_api {
 }
 
 function stop_chromium {
-  local PID=$(cat $KIOSK_CHROME_PID)
-  if ps -p $PID 2> /dev/null | grep -q "chromium"; then
-    echo "  [Chromium] Stopping at PID $PID."
-    kill $PID
-  fi
+  (pkill chromium && \
+  echo "  [Chromium] Stopping existing chromium instances") \ || true
 }
 
 function stop_python_api {
@@ -154,8 +149,8 @@ function usage {
 # =====================================
 
 touch $KIOSK_PYTHON_LOG $KIOSK_CHROME_LOG $KIOSK_PYTHON_PID \
-      $KIOSK_CHROME_PID $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE \
-      $KIOSK_CONFIG_LAST $KIOSK_CONFIG_PAGE_TEMP
+      $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_LAST \
+      $KIOSK_CONFIG_PAGE_TEMP
 
 if ! check_dependencies && ! [ "$1" == "help" ] ; then
   echo "Please install the missing dependencies"

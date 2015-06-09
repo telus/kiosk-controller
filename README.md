@@ -5,6 +5,8 @@ A CLI app and HTTP API to remotely control Chromium running in a kiosk mode.
 
 Originally built for opening dashboards on TV-connected Raspberry Pis.
 
+**NOTE**: Since Chrome/Chromium is multi-process, the author was unable to find a reliable way to target a single window/tab. Instead, `kiosk` terminates all chromium processes before creating a new one when (re)starting.
+
 ## Dependencies
 
 Kiosk Controller requires:
@@ -43,6 +45,9 @@ Otherwise, if no page is specified, an HTTP 400 is returned.
 
 ##Todo
 
-- fix chrome restart failing to close old window
 - Code review
 - Remove dependency on bottle?
+
+#Ideas
+
+- An iframe + sockets based page could get around the chromium control issues. The CLI could hook into a server sending messages to the client to switch the page, reload it, etc.
