@@ -117,7 +117,7 @@ function start_python_api {
 
 function stop_chromium {
   (pkill chromium && \
-  echo "  [Chromium] Stopping existing chromium instances") \ || true
+  echo "  [Chromium] Stopping existing chromium instances") || true
 }
 
 function stop_python_api {
