@@ -9,13 +9,7 @@ Originally built for opening dashboards on TV-connected Raspberry Pis.
 
 ## Dependencies
 
-Kiosk Controller requires:
-
-- `chromium-browser`
-- `python3`
-- `bottle.py` library
-
-Running `./kiosk` will notify you of missing dependencies and how to fix them.
+Kiosk Controller requires: `chromium-browser` and `python3`. Running any `./kiosk` command will let you know if they are missing.
 
 ## CLI
 
@@ -23,9 +17,7 @@ Run `./kiosk help` for a list of available commands.
 
 ## HTTP API
 
-By default, kiosk will start an HTTP API with the following endpoints.
-
-A HTTP header of 'kiosk-auth' may be needed if you set an API password using the CLI.
+By default, kiosk will start an HTTP API. A HTTP header of 'kiosk-auth' will be needed if you set an API password using the CLI.
 
 **`GET / ` - Current status**
 
@@ -46,7 +38,6 @@ Otherwise, if no page is specified, an HTTP 400 is returned.
 ##Todo
 
 - Code review
-- Remove dependency on bottle?
 
 #Ideas
 

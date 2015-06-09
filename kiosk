@@ -33,10 +33,6 @@ function check_dependencies {
     >&2 echo "Missing python3: sudo apt-get install python3";
     STATUS=1;
   }
-  if [[ ! -f bottle.py ]]; then
-    >&2 echo "Missing bottle.py library: wget -q http://bottlepy.org/bottle.py"
-    STATUS=1;
-  fi
   return $STATUS
 }
 
@@ -108,7 +104,7 @@ function start_python_api {
     echo "[Python API] Offline because port=0"
     return
   fi
-  nohup python3 kiosk-http-api.py $0 $KIOSK_PORT $KIOSK_CONFIG_LAST \
+  nohup python3 -u kiosk-http-api.py $0 $KIOSK_PORT $KIOSK_CONFIG_LAST \
                 $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_PAGE_TEMP $KIOSK_AUTH \
         >$KIOSK_PYTHON_LOG 2>&1 &
   echo $! > $KIOSK_PYTHON_PID
@@ -152,7 +148,7 @@ touch $KIOSK_PYTHON_LOG $KIOSK_CHROME_LOG $KIOSK_PYTHON_PID \
       $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_LAST \
       $KIOSK_CONFIG_PAGE_TEMP
 
-if ! check_dependencies && ! [ "$1" == "help" ] ; then
+if ! check_dependencies; then
   echo "Please install the missing dependencies"
   exit 1
 fi

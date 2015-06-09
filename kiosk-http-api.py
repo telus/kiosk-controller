@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 
 import subprocess, sys
-from bottle import route, run, request, response
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-kiosk_script = sys.argv[1]
-server_port = int(sys.argv[2])
-current_page_file = sys.argv[3]
-saved_page_file = sys.argv[4]
-temp_page_file = sys.argv[5]
+kiosk_script, server_port, current_page_file, \
+saved_page_file, temp_page_file = sys.argv[1:6]
 try:
     server_auth = sys.argv[6]
 except IndexError:
@@ -28,7 +25,6 @@ def overwriteFile(data, filename):
     file.close();
 
 def getPage():
-    response.content_type = "text/plain"
     return readFile(current_page_file)
 
 def setTempPage(url):
@@ -37,37 +33,47 @@ def setTempPage(url):
 def setPage(url):
     overwriteFile(url, saved_page_file)
 
-def authorized():
-    if server_auth != request.get_header('kiosk-auth', ''):
-        response.status = "401 Invalid password"
-        return False
-    return True
+class KioskHandler(BaseHTTPRequestHandler):
+    def handle(self):
+        '''Overriden from parent to perform authorization'''
+        self.raw_requestline = self.rfile.readline()
+        if not self.parse_request():
+            return
+        if server_auth != self.headers.get('kiosk-auth', ''):
+            self.send_error(401)
+            return
+        mname = 'do_' + self.command
+        if not hasattr(self, mname):
+            self.send_error(405)
+            return
+        method = getattr(self, mname)
+        method()
 
-@route('/', method='GET')
-def status():
-    if not (authorized()):
-        return
-    return getPage()
+    def sendPlainText(self, message):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(bytes(message.strip(), 'utf-8'))
 
-@route('/', method='POST')
-def status():
-    if not (authorized()):
-        return
-    newpage = request.get_header('kiosk-page', '')
-    if len(newpage) > 0:
-        setTempPage(newpage)
-    restartChromium()
-    return getPage()
+    def do_GET(self):
+        print(getPage())
+        self.sendPlainText(getPage())
 
-@route('/', method='PUT')
-def status():
-    if not (authorized()):
-        return
-    newpage = request.get_header('kiosk-page', '')
-    if len(newpage) > 0:
-        setPage(newpage)
+    def do_POST(self):
+        newpage = self.headers.get('kiosk-page', '')
+        if len(newpage) > 0:
+            setTempPage(newpage)
         restartChromium()
-        return getPage()
-    response.status = "400 No page specified"
+        self.sendPlainText(getPage())
 
-run(host='localhost', port=server_port)
+    def do_PUT(self):
+        newpage = self.headers.get('kiosk-page', '')
+        if len(newpage) > 0:
+            setPage(newpage)
+            restartChromium()
+            self.sendPlainText(getPage())
+            return
+        self.send_error(400)
+
+httpd = HTTPServer(('localhost', int(server_port)), KioskHandler)
+httpd.serve_forever()
