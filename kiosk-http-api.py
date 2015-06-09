@@ -8,6 +8,10 @@ server_port = int(sys.argv[2])
 current_page_file = sys.argv[3]
 saved_page_file = sys.argv[4]
 temp_page_file = sys.argv[5]
+try:
+    server_auth = sys.argv[6]
+except IndexError:
+    server_auth = ""
 
 def restartChromium():
     subprocess.call(kiosk_script + " chromium", shell=True)
@@ -33,12 +37,22 @@ def setTempPage(url):
 def setPage(url):
     overwriteFile(url, saved_page_file)
 
+def authorized():
+    if server_auth != request.get_header('kiosk-auth', ''):
+        response.status = "401 Invalid password"
+        return False
+    return True
+
 @route('/', method='GET')
 def status():
+    if not (authorized()):
+        return
     return getPage()
 
 @route('/', method='POST')
 def status():
+    if not (authorized()):
+        return
     newpage = request.get_header('kiosk-page', '')
     if len(newpage) > 0:
         setTempPage(newpage)
@@ -47,6 +61,8 @@ def status():
 
 @route('/', method='PUT')
 def status():
+    if not (authorized()):
+        return
     newpage = request.get_header('kiosk-page', '')
     if len(newpage) > 0:
         setPage(newpage)

@@ -17,6 +17,7 @@ KIOSK_CHROME_PID=./data/chrome.pid
 KIOSK_CONFIG_PORT=./data/config-port
 KIOSK_CONFIG_PAGE=./data/config-page
 KIOSK_CONFIG_LAST=./data/config-last
+KIOSK_CONFIG_AUTH=./data/config-auth
 KIOSK_CONFIG_PAGE_TEMP=./data/config-temp
 
 # =====================================
@@ -64,10 +65,21 @@ function set_port {
   echo "$1" > $KIOSK_CONFIG_PORT
 }
 
+function set_auth {
+  echo "$1" > $KIOSK_CONFIG_AUTH
+}
+
 function get_port {
   KIOSK_PORT=$(cat $KIOSK_CONFIG_PORT)
   if [ -z "$KIOSK_PORT" ]; then
     KIOSK_PORT=$KIOSK_FALLBACK_PORT
+  fi
+}
+
+function get_auth {
+  KIOSK_AUTH=$(cat $KIOSK_CONFIG_AUTH)
+  if [ -z "$KIOSK_AUTH" ]; then
+    KIOSK_AUTH=""
   fi
 }
 
@@ -93,12 +105,13 @@ function start_chromium {
 
 function start_python_api {
   get_port
+  get_auth
   if [[ "$KIOSK_PORT" = "0" ]]; then
     echo "[Python API] Offline because port=0"
     return
   fi
   nohup python3 kiosk-http-api.py $0 $KIOSK_PORT $KIOSK_CONFIG_LAST \
-                $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_PAGE_TEMP \
+                $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_PAGE_TEMP $KIOSK_AUTH \
         >$KIOSK_PYTHON_LOG 2>&1 &
   echo $! > $KIOSK_PYTHON_PID
   echo "[Python API] Starting at PID $! on port $KIOSK_PORT"
@@ -126,10 +139,11 @@ function usage {
   echo "For details on the HTTP API this exposes, consult the README"
   echo
   echo "  api               (re)starts just the API"
+  echo "  auth <pass>       changes the API password; leave blank for none"
   echo "  chromium          (re)starts just Chromium"
   echo "  help              prints this help"
   echo "  page <url>        sets the default page"
-  echo "  port <number>     sets the default API port; 0 to disable"
+  echo "  port <number>     sets the default API port; 0 to disable API"
   echo "  start             (re)starts the API server and Chromium"
   echo "  start <url>       one-time (re)start with the specified url"
   echo "  stop              stops the API server and Chromium"
@@ -151,6 +165,8 @@ fi
 if [ "$1" == "api" ]; then
   stop_python_api
   start_python_api
+elif [ "$1" == "auth" ]; then
+  set_auth $2
 elif [ "$1" == "chromium" ]; then
   stop_chromium
   start_chromium
