@@ -5,7 +5,9 @@ A CLI app and HTTP API to remotely control Chromium running in a kiosk mode.
 
 Originally built for opening dashboards on TV-connected Raspberry Pis.
 
-**NOTE**: Since Chrome/Chromium is multi-process, the author was unable to find a reliable way to target a single window/tab. Instead, `kiosk` terminates all chromium processes before creating a new one when (re)starting.
+**NOTE**: Since starting Chromium spawns multiple processes (and possibily stops the initial one stored in shell variable `$!`), I was unable to find a reliable way to target a single window/tab. As a result, `kiosk` terminates all chromium processes before creating a new one when (re)starting.
+
+**NOTE**: This app assumes that the X Server is running on display `:0`, which allows the CLI to open Chromium correctly in a console and over SSH.
 
 ## Dependencies
 

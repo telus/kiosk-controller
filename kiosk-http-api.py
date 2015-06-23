@@ -35,7 +35,7 @@ def setPage(url):
 
 class KioskHandler(BaseHTTPRequestHandler):
     def handle(self):
-        '''Overriden from parent to perform authorization'''
+        '''Overridden from parent to perform authorization'''
         self.raw_requestline = self.rfile.readline()
         if not self.parse_request():
             return
