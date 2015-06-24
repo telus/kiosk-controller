@@ -39,6 +39,10 @@ function check_dependencies {
 function initialize {
   export DISPLAY=:0
 
+  xset s off
+  xset -dpms
+  xset s noblank
+
   touch $KIOSK_PYTHON_LOG $KIOSK_CHROME_LOG $KIOSK_PYTHON_PID \
         $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_LAST \
         $KIOSK_CONFIG_PAGE_TEMP $KIOSK_CONFIG_AUTH
