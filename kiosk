@@ -110,7 +110,10 @@ function get_page {
 function start_chromium {
   get_page
   nohup chromium-browser --incognito \
-        --kiosk $KIOSK_PAGE >$KIOSK_CHROME_LOG 2>&1 &
+        --disable-session-crashed-bubble \
+        --disable-infobars \
+        --kiosk "$KIOSK_PAGE" \
+        >$KIOSK_CHROME_LOG 2>&1 &
   echo "  [Chromium] Started with URL $KIOSK_PAGE"
 }
 
