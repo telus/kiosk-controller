@@ -82,24 +82,24 @@ function set_auth {
 }
 
 function get_port {
-  KIOSK_PORT=$(cat $KIOSK_CONFIG_PORT)
+  KIOSK_PORT=$(<$KIOSK_CONFIG_PORT)
   if [ -z "$KIOSK_PORT" ]; then
     KIOSK_PORT=$KIOSK_FALLBACK_PORT
   fi
 }
 
 function get_auth {
-  KIOSK_AUTH=$(cat $KIOSK_CONFIG_AUTH)
+  KIOSK_AUTH=$(<$KIOSK_CONFIG_AUTH)
   if [ -z "$KIOSK_AUTH" ]; then
     KIOSK_AUTH=""
   fi
 }
 
 function get_page {
-  KIOSK_PAGE=$(cat $KIOSK_CONFIG_PAGE_TEMP)
+  KIOSK_PAGE=$(<$KIOSK_CONFIG_PAGE_TEMP)
   echo "" > $KIOSK_CONFIG_PAGE_TEMP
   if [ -z "$KIOSK_PAGE" ]; then
-    KIOSK_PAGE=$(cat $KIOSK_CONFIG_PAGE)
+    KIOSK_PAGE=$(<$KIOSK_CONFIG_PAGE)
   fi
   if [ -z "$KIOSK_PAGE" ]; then
     KIOSK_PAGE=$KIOSK_FALLBACK_PAGE
@@ -137,7 +137,7 @@ function stop_chromium {
 }
 
 function stop_python_api {
-  local PID=$(cat $KIOSK_PYTHON_PID)
+  local PID=$(<$KIOSK_PYTHON_PID)
   if ps -p $PID 2> /dev/null | grep -q "python"; then
     echo "[Python API] Stopping at PID $PID."
     kill $PID
