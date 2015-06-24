@@ -74,5 +74,5 @@ class KioskHandler(BaseHTTPRequestHandler):
             return
         self.send_error(400)
 
-httpd = HTTPServer(('localhost', int(server_port)), KioskHandler)
+httpd = HTTPServer(('', int(server_port)), KioskHandler)
 httpd.serve_forever()
