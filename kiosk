@@ -36,6 +36,19 @@ function check_dependencies {
   return $STATUS
 }
 
+function initialize {
+  export DISPLAY=:0
+
+  touch $KIOSK_PYTHON_LOG $KIOSK_CHROME_LOG $KIOSK_PYTHON_PID \
+        $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_LAST \
+        $KIOSK_CONFIG_PAGE_TEMP $KIOSK_CONFIG_AUTH
+
+  if ! check_dependencies; then
+    echo "Please install the missing dependencies"
+    exit 1
+  fi
+}
+
 function set_page {
   if [ -z "$1" ]; then
     echo "No page specified"
@@ -92,7 +105,7 @@ function get_page {
 
 function start_chromium {
   get_page
-  DISPLAY=:0 nohup chromium-browser --incognito \
+  nohup chromium-browser --incognito \
         --kiosk $KIOSK_PAGE >$KIOSK_CHROME_LOG 2>&1 &
   echo "  [Chromium] Started with URL $KIOSK_PAGE"
 }
@@ -144,14 +157,7 @@ function usage {
 # Initialization
 # =====================================
 
-touch $KIOSK_PYTHON_LOG $KIOSK_CHROME_LOG $KIOSK_PYTHON_PID \
-      $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_LAST \
-      $KIOSK_CONFIG_PAGE_TEMP $KIOSK_CONFIG_AUTH
-
-if ! check_dependencies; then
-  echo "Please install the missing dependencies"
-  exit 1
-fi
+initialize
 
 if [ "$1" == "api" ]; then
   stop_python_api
