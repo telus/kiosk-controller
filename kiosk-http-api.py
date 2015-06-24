@@ -56,7 +56,6 @@ class KioskHandler(BaseHTTPRequestHandler):
         self.wfile.write(bytes(message.strip(), 'utf-8'))
 
     def do_GET(self):
-        print(getPage())
         self.sendPlainText(getPage())
 
     def do_POST(self):
