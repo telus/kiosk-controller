@@ -8,16 +8,18 @@ set -e
 KIOSK_FALLBACK_PORT=8000
 KIOSK_FALLBACK_PAGE="http://google.com"
 
-KIOSK_PYTHON_LOG=./data/python.log
-KIOSK_CHROME_LOG=./data/chrome.log
+KIOSK_CONFIG_DIR=~/.kiosk
 
-KIOSK_PYTHON_PID=./data/python.pid
+KIOSK_PYTHON_LOG="$KIOSK_CONFIG_DIR/python.log"
+KIOSK_CHROME_LOG="$KIOSK_CONFIG_DIR/chrome.log"
 
-KIOSK_CONFIG_PORT=./data/config-port
-KIOSK_CONFIG_PAGE=./data/config-page
-KIOSK_CONFIG_LAST=./data/config-last
-KIOSK_CONFIG_AUTH=./data/config-auth
-KIOSK_CONFIG_PAGE_TEMP=./data/config-temp
+KIOSK_PYTHON_PID="$KIOSK_CONFIG_DIR/python.pid"
+
+KIOSK_CONFIG_PORT="$KIOSK_CONFIG_DIR/config-port"
+KIOSK_CONFIG_PAGE="$KIOSK_CONFIG_DIR/config-page"
+KIOSK_CONFIG_LAST="$KIOSK_CONFIG_DIR/config-last"
+KIOSK_CONFIG_AUTH="$KIOSK_CONFIG_DIR/config-auth"
+KIOSK_CONFIG_PAGE_TEMP="$KIOSK_CONFIG_DIR/config-temp"
 
 # =====================================
 # Functions
@@ -38,6 +40,8 @@ function check_dependencies {
 
 function initialize {
   export DISPLAY=:0
+
+  mkdir -p $KIOSK_CONFIG_DIR
 
   xset s off
   xset -dpms
