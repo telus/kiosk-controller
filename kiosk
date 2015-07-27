@@ -12,14 +12,17 @@ KIOSK_CONFIG_DIR=~/.kiosk
 
 KIOSK_PYTHON_LOG="$KIOSK_CONFIG_DIR/python.log"
 KIOSK_CHROME_LOG="$KIOSK_CONFIG_DIR/chrome.log"
+KIOSK_MIDORI_LOG="$KIOSK_CONFIG_DIR/midori.log"
 
 KIOSK_PYTHON_PID="$KIOSK_CONFIG_DIR/python.pid"
+KIOSK_MIDORI_PID="$KIOSK_CONFIG_DIR/midori.pid"
 
 KIOSK_CONFIG_PORT="$KIOSK_CONFIG_DIR/config-port"
 KIOSK_CONFIG_PAGE="$KIOSK_CONFIG_DIR/config-page"
 KIOSK_CONFIG_LAST="$KIOSK_CONFIG_DIR/config-last"
 KIOSK_CONFIG_AUTH="$KIOSK_CONFIG_DIR/config-auth"
 KIOSK_CONFIG_PAGE_TEMP="$KIOSK_CONFIG_DIR/config-temp"
+KIOSK_CONFIG_BROWSER="$KIOSK_CONFIG_DIR/config-browser"
 
 # =====================================
 # Functions
@@ -29,6 +32,10 @@ function check_dependencies {
   local STATUS=0
   command -v chromium-browser >/dev/null 2>&1 || {
     >&2 echo "Missing chromium-browser: sudo apt-get install chromium-browser"
+    STATUS=1;
+  }
+  command -v midori >/dev/null 2>&1 || {
+    >&2 echo "Missing midori: sudo apt-get install midori"
     STATUS=1;
   }
   command -v python3 >/dev/null 2>&1 || {
@@ -49,7 +56,8 @@ function initialize {
 
   touch $KIOSK_PYTHON_LOG $KIOSK_CHROME_LOG $KIOSK_PYTHON_PID \
         $KIOSK_CONFIG_PORT $KIOSK_CONFIG_PAGE $KIOSK_CONFIG_LAST \
-        $KIOSK_CONFIG_PAGE_TEMP $KIOSK_CONFIG_AUTH
+        $KIOSK_CONFIG_PAGE_TEMP $KIOSK_CONFIG_AUTH $KIOSK_MIDORI_LOG \
+        $KIOSK_MIDORI_PID $KIOSK_CONFIG_BROWSER
 
   if ! check_dependencies; then
     echo "Please install the missing dependencies"
@@ -85,6 +93,15 @@ function set_auth {
   echo "$1" > $KIOSK_CONFIG_AUTH
 }
 
+function set_browser {
+  if [[ "$1" == "chromium" ]] || [[ "$1" == "midori" ]] ; then
+    echo "$1" > $KIOSK_CONFIG_BROWSER
+  else
+    >&2 echo "Not a valid browser"
+    exit 1
+  fi
+}
+
 function get_port {
   KIOSK_PORT=$(<$KIOSK_CONFIG_PORT)
   if [ -z "$KIOSK_PORT" ]; then
@@ -96,6 +113,15 @@ function get_auth {
   KIOSK_AUTH=$(<$KIOSK_CONFIG_AUTH)
   if [ -z "$KIOSK_AUTH" ]; then
     KIOSK_AUTH=""
+  fi
+}
+
+function get_browser {
+  KIOSK_BROWSER=$(<$KIOSK_CONFIG_BROWSER)
+  if [ -z "$KIOSK_BROWSER" ]; then
+    KIOSK_BROWSER="midori"
+  else
+    KIOSK_BROWSER="chromium"
   fi
 }
 
@@ -114,11 +140,28 @@ function get_page {
 function start_chromium {
   get_page
   nohup chromium-browser --incognito \
-        --disable-session-crashed-bubble \
-        --disable-infobars \
+        --disable-session-crashed-bubble --disable-restore-session-state \
+        --disable-infobars --disable-sync --disable-translate \
         --kiosk "$KIOSK_PAGE" \
         >$KIOSK_CHROME_LOG 2>&1 &
   echo "  [Chromium] Started with URL $KIOSK_PAGE"
+}
+
+function start_midori {
+  get_page
+  nohup midori -p -e Fullscreen -a "$KIOSK_PAGE" \
+        >$KIOSK_MIDORI_LOG 2>&1 &
+  echo $! > $KIOSK_MIDORI_PID
+  echo "    [Midori] Started with URL $KIOSK_PAGE"
+}
+
+function start_browser {
+  get_browser
+  if [[ "$KIOSK_BROWSER" = "chromium" ]]; then
+    start_chromium
+  else
+    start_midori
+  fi
 }
 
 function start_python_api {
@@ -140,6 +183,23 @@ function stop_chromium {
   echo "  [Chromium] Stopping existing chromium instances") || true
 }
 
+function stop_midori {
+  local PID=$(<$KIOSK_MIDORI_PID)
+  if ps -p $PID 2> /dev/null | grep -q "midori"; then
+    echo "    [Midori] Stopping at PID $PID."
+    kill $PID
+  fi
+}
+
+function stop_browser {
+  get_browser
+  if [[ "$KIOSK_BROWSER" = "chromium" ]]; then
+    stop_chromium
+  else
+    stop_midori
+  fi
+}
+
 function stop_python_api {
   local PID=$(<$KIOSK_PYTHON_PID)
   if ps -p $PID 2> /dev/null | grep -q "python"; then
@@ -155,13 +215,14 @@ function usage {
   echo
   echo "  api               (re)starts just the API"
   echo "  auth <pass>       changes the API password; leave blank for none"
-  echo "  chromium          (re)starts just Chromium"
+  echo "  browser <name>    changes the browser that will be used"
+  echo "  browser           (re)starts just the browser"
   echo "  help              prints this help"
   echo "  page <url>        sets the default page"
   echo "  port <number>     sets the default API port; 0 to disable API"
-  echo "  start             (re)starts the API server and Chromium"
+  echo "  start             (re)starts the API server and browser"
   echo "  start <url>       one-time (re)start with the specified url"
-  echo "  stop              stops the API server and Chromium"
+  echo "  stop              stops the API server and browser"
 }
 
 # =====================================
@@ -175,23 +236,27 @@ if [ "$1" == "api" ]; then
   start_python_api
 elif [ "$1" == "auth" ]; then
   set_auth "$2"
-elif [ "$1" == "chromium" ]; then
-  stop_chromium
-  start_chromium
+elif [ "$1" == "browser" ]; then
+  if [ -n "$2" ]; then
+    set_browser "$2"
+  else
+    stop_browser
+    start_browser
+  fi
 elif [ "$1" == "page" ]; then
   set_page "$2"
 elif [ "$1" == "port" ]; then
   set_port "$2"
 elif [ "$1" == "start" ]; then
-  stop_chromium
+  stop_browser
   stop_python_api
   if [ -n "$2" ]; then
     set_temp_page "$2"
   fi
-  start_chromium
+  start_browser
   start_python_api
 elif [ "$1" == "stop" ]; then
-  stop_chromium
+  stop_browser
   stop_python_api
 else
   usage

@@ -10,8 +10,8 @@ try:
 except IndexError:
     server_auth = ""
 
-def restartChromium():
-    subprocess.call(kiosk_script + " chromium", shell=True)
+def restartBrowser():
+    subprocess.call(kiosk_script + " browser", shell=True)
 
 def readFile(fileName):
     file = open(fileName, 'r');
@@ -62,14 +62,14 @@ class KioskHandler(BaseHTTPRequestHandler):
         newpage = self.headers.get('kiosk-page', '')
         if len(newpage) > 0:
             setTempPage(newpage)
-        restartChromium()
+        restartBrowser()
         self.sendPlainText(getPage())
 
     def do_PUT(self):
         newpage = self.headers.get('kiosk-page', '')
         if len(newpage) > 0:
             setPage(newpage)
-            restartChromium()
+            restartBrowser()
             self.sendPlainText(getPage())
             return
         self.send_error(400)
