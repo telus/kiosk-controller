@@ -118,10 +118,8 @@ function get_auth {
 
 function get_browser {
   KIOSK_BROWSER=$(<$KIOSK_CONFIG_BROWSER)
-  if [ -z "$KIOSK_BROWSER" ]; then
+  if [ "$KIOSK_BROWSER" != "chromium" ]; then
     KIOSK_BROWSER="midori"
-  else
-    KIOSK_BROWSER="chromium"
   fi
 }
 
