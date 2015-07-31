@@ -118,8 +118,8 @@ function get_auth {
 
 function get_browser {
   KIOSK_BROWSER=$(<$KIOSK_CONFIG_BROWSER)
-  if [ "$KIOSK_BROWSER" != "chromium" ]; then
-    KIOSK_BROWSER="midori"
+  if [ "$KIOSK_BROWSER" != "midori" ]; then
+    KIOSK_BROWSER="chromium"
   fi
 }
 
@@ -155,10 +155,10 @@ function start_midori {
 
 function start_browser {
   get_browser
-  if [[ "$KIOSK_BROWSER" = "chromium" ]]; then
-    start_chromium
-  else
+  if [[ "$KIOSK_BROWSER" = "midori" ]]; then
     start_midori
+  else
+    start_chromium
   fi
 }
 
@@ -191,10 +191,10 @@ function stop_midori {
 
 function stop_browser {
   get_browser
-  if [[ "$KIOSK_BROWSER" = "chromium" ]]; then
-    stop_chromium
-  else
+  if [[ "$KIOSK_BROWSER" = "midori" ]]; then
     stop_midori
+  else
+    stop_chromium
   fi
 }
 
