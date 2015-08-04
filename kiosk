@@ -28,14 +28,21 @@ KIOSK_CONFIG_BROWSER="$KIOSK_CONFIG_DIR/config-browser"
 # Functions
 # =====================================
 
+function has_chromium {
+  command -v chromium-browser >/dev/null 2>&1
+}
+
+function has_midori {
+  command -v midori >/dev/null 2>&1
+}
+
 function check_dependencies {
   local STATUS=0
-  command -v chromium-browser >/dev/null 2>&1 || {
-    >&2 echo "Missing chromium-browser: sudo apt-get install chromium-browser"
-    STATUS=1;
-  }
-  command -v midori >/dev/null 2>&1 || {
-    >&2 echo "Missing midori: sudo apt-get install midori"
+  has_chromium || has_midori || \
+  {
+    >&2 echo "Missing a browser: Install either Chromium or Midori"
+    >&2 echo "sudo apt-get install midori"
+    >&2 echo "sudo apt-get install chromium-browser"
     STATUS=1;
   }
   command -v python3 >/dev/null 2>&1 || {
@@ -60,7 +67,6 @@ function initialize {
         $KIOSK_MIDORI_PID $KIOSK_CONFIG_BROWSER
 
   if ! check_dependencies; then
-    echo "Please install the missing dependencies"
     exit 1
   fi
 }
@@ -118,8 +124,14 @@ function get_auth {
 
 function get_browser {
   KIOSK_BROWSER=$(<$KIOSK_CONFIG_BROWSER)
-  if [ "$KIOSK_BROWSER" != "chromium" ]; then
+  if ! has_chromium && [ "$KIOSK_BROWSER" == "chromium" ]; then
+    [[ "$1" == "--quiet" ]] || \
+     >&2 echo "Wanted to use Chromium, but it's not installed!"
     KIOSK_BROWSER="midori"
+  elif ! has_midori  && [ "$KIOSK_BROWSER" == "midori" ]; then
+    [[ "$1" == "--quiet" ]] || \
+    >&2 echo "Wanted to use Midori, but it's not installed!"
+    KIOSK_BROWSER="chromium"
   fi
 }
 
@@ -155,10 +167,10 @@ function start_midori {
 
 function start_browser {
   get_browser
-  if [[ "$KIOSK_BROWSER" = "chromium" ]]; then
-    start_chromium
-  else
+  if [[ "$KIOSK_BROWSER" = "midori" ]]; then
     start_midori
+  else
+    start_chromium
   fi
 }
 
@@ -190,11 +202,11 @@ function stop_midori {
 }
 
 function stop_browser {
-  get_browser
-  if [[ "$KIOSK_BROWSER" = "chromium" ]]; then
-    stop_chromium
-  else
+  get_browser --quiet
+  if [[ "$KIOSK_BROWSER" = "midori" ]]; then
     stop_midori
+  else
+    stop_chromium
   fi
 }
 
