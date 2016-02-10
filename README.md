@@ -1,6 +1,8 @@
 Kiosk Controller
 ================
 
+[![Code Climate](https://codeclimate.com/github/telusdigital/kiosk-controller/badges/gpa.svg)](https://codeclimate.com/github/telusdigital/kiosk-controller)
+
 A CLI app and HTTP API to remotely control Chromium or Midori running in a kiosk mode.
 
 Originally built for opening dashboards on TV-connected Raspberry Pis.
